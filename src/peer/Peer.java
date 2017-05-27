@@ -1,4 +1,7 @@
 package peer;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
@@ -26,12 +29,13 @@ public class Peer
 			
 	public static void main(String[] args) throws IOException
 	{
-		id = new SessionIdentifierGenerator().nextSessionId();
+		id = new IdGenerator().nextId();
 		int httpServerPort = Integer.parseInt(args[0]);
 		
 		//Initiate http server
 		try {
 			HttpServer server = HttpServer.create(new InetSocketAddress(httpServerPort), 0);
+			server.createContext("/file", new FileHandler());
 			server.createContext("/files", new FilesHandler());
 			server.createContext("/test", new TestHandler());
 			server.setExecutor(new ThreadPoolExecutor(4, 8, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(100)));
@@ -49,14 +53,22 @@ public class Peer
         //Initiate advertise thread
         Thread listenerThread = new PeerListenerThread("listener", 7000);
         listenerThread.start();
+                
+        while(peersInRange.isEmpty()){
+        	try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+        }
+        testGetFile();
         
         while(true){
-        	//listPeersInRange();
-        	testServer();
+        	listPeersInRange();
+        	//testServer();
         	try {
 				Thread.sleep(10000);
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
         }
@@ -99,7 +111,7 @@ public class Peer
 
 				url += "?" + String.format("param1=%s&param2=%s", URLEncoder.encode("a", charset), URLEncoder.encode("b", charset));
 				httpConnection = (HttpURLConnection) new URL(url).openConnection();
-
+				httpConnection.setRequestProperty("Accept-Charset", charset);
 				response = httpConnection.getInputStream();
 				
 				int status = httpConnection.getResponseCode();
@@ -115,6 +127,7 @@ public class Peer
 				    String responseBody = scanner.useDelimiter("\\A").next();
 				    System.out.println("Response Body:\n" + responseBody);
 				}
+				System.out.println();
 			}
 			catch (UnsupportedEncodingException e) {
 				// TODO Auto-generated catch block
@@ -126,6 +139,59 @@ public class Peer
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+		}		
+	}
+
+	private static void testGetFile()
+	{
+		PeerInRange peer = peersInRange.entrySet().iterator().next().getValue();
+
+		String url = "http://" + peer.getIp().getHostAddress() + ":" + peer.getPort() + "/file";		
+
+		try {
+
+			HttpURLConnection httpConnection = null;
+			InputStream response = null;
+
+			httpConnection = (HttpURLConnection) new URL(url).openConnection();
+			response = httpConnection.getInputStream();
+
+			int status = httpConnection.getResponseCode();
+			System.out.println("Response Code: " + status);
+
+			//HTTP response headers:
+			System.out.println("Response Headers:");
+			for (java.util.Map.Entry<String, List<String>> header : httpConnection.getHeaderFields().entrySet()) {
+				System.out.println(header.getKey() + "=" + header.getValue());
+			}
+			
+			FileOutputStream stream = null;
+			try {		
+				stream = new FileOutputStream(new File("test.pdf"));
+				byte[] bytes = new byte[1000];
+				
+				int n;
+				while((n = response.read(bytes)) != -1){
+					System.out.println(n);
+					stream.write(bytes, 0, n);
+				}
+			}
+			catch(Exception e)
+			{
+				System.out.println(e);
+				return;
+			}
+			finally{
+				try { stream.close(); } catch (IOException e) { }
+			}
+			System.out.println("Received file");
+		}
+		catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}		
 	}
 }

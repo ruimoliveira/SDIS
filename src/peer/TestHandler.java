@@ -21,30 +21,27 @@ public class TestHandler implements HttpHandler {
 		//Request Method
 		String method = t.getRequestMethod();
 		System.out.println("Request Method: " + method);
-		System.out.println();
 
 		//Request Headers
 		Headers headers = t.getRequestHeaders();
 		System.out.println("Request Headers:");
 		for (Entry<String, List<String>> header : headers.entrySet()) {
-			System.out.print(header.getKey() + ": ");
+			System.out.print("  " + header.getKey() + ": ");
 			for (String str : header.getValue()) {
 				System.out.print(str + " ");
 			}
 			System.out.println();
 		}
-		System.out.println();
 
 		//Request query
 		String query = t.getRequestURI().getQuery();
 		Map<String, String> params = null;
 		if (query != null){
-			params = queryToMap(query);
+			params = HttpHandlerUtil.queryToMap(query);
 			System.out.println("Request Query:");
 			for (Entry<String, String> param : params.entrySet()){
-				System.out.println(param.getKey() + "=" + param.getValue());
+				System.out.println("  " + param.getKey() + "=" + param.getValue());
 			}
-			System.out.println();
 		}
 
 		//Request Body
@@ -81,8 +78,8 @@ public class TestHandler implements HttpHandler {
 		}
 
 		//Response
-		System.out.println(response);
-		System.out.println();
+		//System.out.println(response);
+		//System.out.println();
 
 		//getResponseHeaders
 		//Headers responseHeaders = t.getResponseHeaders();
@@ -95,19 +92,4 @@ public class TestHandler implements HttpHandler {
 		os.write(response.getBytes());
 		os.close();
 	}
-	
-    public Map<String, String> queryToMap(String query)
-    {
-        Map<String, String> result = new HashMap<String, String>();
-        
-        for (String param : query.split("&")) {
-            String pair[] = param.split("=");
-            if (pair.length > 1) {
-                result.put(pair[0], pair[1]);
-            }else{
-                result.put(pair[0], "");
-            }
-        }
-        return result;
-    }
 }
