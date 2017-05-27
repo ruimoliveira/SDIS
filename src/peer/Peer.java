@@ -29,7 +29,7 @@ public class Peer
 			
 	public static void main(String[] args) throws IOException
 	{
-		id = new IdGenerator().nextId();
+		id = IdGenerator.nextId();
 		int httpServerPort = Integer.parseInt(args[0]);
 		
 		//Initiate http server
@@ -146,16 +146,17 @@ public class Peer
 	{
 		PeerInRange peer = peersInRange.entrySet().iterator().next().getValue();
 
-		String url = "http://" + peer.getIp().getHostAddress() + ":" + peer.getPort() + "/file";		
-
+		String url = "http://" + peer.getIp().getHostAddress() + ":" + peer.getPort() + "/file";
+		String charset = java.nio.charset.StandardCharsets.UTF_8.name();		
 		try {
-
+			String testFile = "test.pdf";
+			String msgId = IdGenerator.nextId();
+			url += "?" + String.format("id=%s&msg=%s&peer=%s", URLEncoder.encode(testFile, charset), URLEncoder.encode(msgId, charset), URLEncoder.encode(id, charset));
+			
 			HttpURLConnection httpConnection = null;
 			InputStream response = null;
 
 			httpConnection = (HttpURLConnection) new URL(url).openConnection();
-			response = httpConnection.getInputStream();
-
 			int status = httpConnection.getResponseCode();
 			System.out.println("Response Code: " + status);
 
@@ -165,14 +166,14 @@ public class Peer
 				System.out.println(header.getKey() + "=" + header.getValue());
 			}
 			
+			response = httpConnection.getInputStream();			
 			FileOutputStream stream = null;
 			try {		
-				stream = new FileOutputStream(new File("test.pdf"));
+				stream = new FileOutputStream(new File(testFile));
 				byte[] bytes = new byte[1000];
 				
 				int n;
 				while((n = response.read(bytes)) != -1){
-					System.out.println(n);
 					stream.write(bytes, 0, n);
 				}
 			}

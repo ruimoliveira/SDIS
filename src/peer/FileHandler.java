@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -18,6 +19,8 @@ import com.sun.net.httpserver.HttpHandler;
 @SuppressWarnings("restriction")
 public class FileHandler implements HttpHandler {
 
+	Map<String, String> queryParams = new HashMap<String, String>();
+	
 	@Override
 	public void handle(HttpExchange t)
 	{
@@ -36,15 +39,21 @@ public class FileHandler implements HttpHandler {
 		}
 
 		//Request query
-		String query = t.getRequestURI().getQuery();
-		Map<String, String> params = null;
-		if (query != null){
-			params = HttpHandlerUtil.queryToMap(query);
-			System.out.println("Request Query:");
-			for (Entry<String, String> param : params.entrySet()){
-				System.out.println("  " + param.getKey() + "=" + param.getValue());
+		try {
+			String query = t.getRequestURI().getQuery();
+			if (query != null){
+				query = java.net.URLDecoder.decode(query, "UTF-8");
+				queryParams = HttpHandlerUtil.queryToMap(query);
+				
+				System.out.println("Request Query parameters:");
+				for (Entry<String, String> param : queryParams.entrySet()){
+					System.out.println("  " + param.getKey() + "=" + param.getValue());
+				}
 			}
-		}
+		} catch (UnsupportedEncodingException e1) {
+			e1.printStackTrace();
+		};
+
 
 		//Request Body
 		InputStream is = t.getRequestBody();        
@@ -73,18 +82,10 @@ public class FileHandler implements HttpHandler {
 
 		switch(method)
 		{
-		case "GET":					
-			get(t);
-			break;
-		case "PUT":
-			put(t);
-			break;
-		case "POST":
-			post(t);
-			break;
-		case "DELETE":
-			delete(t);
-			break;
+		case "GET": get(t);	break;
+		case "PUT":	put(t);	break;
+		case "POST": post(t); break;
+		case "DELETE": delete(t); break;
 		}
 	}
 	
@@ -93,16 +94,30 @@ public class FileHandler implements HttpHandler {
 		FileInputStream fs = null;
 		OutputStream os = null;
 		try {
+			String fileId = queryParams.get("id");
+			if(fileId == null)
+			{
+				t.sendResponseHeaders(400, -1);
+				return;
+			}
+					
+			File dir = new File("Files");
+			File file = new File(dir, fileId);
+			
+			if(!file.exists() || file.isDirectory())
+			{
+				t.sendResponseHeaders(204, -1);
+				return;
+			}
+
 			t.sendResponseHeaders(200, 0);
 			os = t.getResponseBody();
-			
-			File dir = new File("Files");			
-			fs = new FileInputStream(new File(dir, "test.pdf"));
+
+			fs = new FileInputStream(file);
 			byte[] bytes = new byte[1000];
 
 			int n;
 			while((n = fs.read(bytes)) != -1){
-				System.out.println(n);
 				os.write(bytes, 0, n);
 			}
 		}
