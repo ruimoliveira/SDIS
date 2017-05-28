@@ -20,11 +20,7 @@ public class ClientHandler implements HttpHandler {
 	public void handle(HttpExchange t) {
 
 		String method = t.getRequestMethod();
-		System.out.println("Request Method: " + method);
-
 		String path = t.getRequestURI().getPath();
-		System.out.println("Request path: " + path);
-		
 		String[] pathContent = path.split("/");
 		
 		if (pathContent.length == 2)
@@ -37,7 +33,7 @@ public class ClientHandler implements HttpHandler {
 				}
 				break;
 			case "GET":
-				list(t);
+				//list(t);
 				break;
 			}
 		else if(pathContent.length == 3 && pathContent[2].compareTo("file") == 0){
@@ -53,8 +49,33 @@ public class ClientHandler implements HttpHandler {
 	}
 
 	private void delete(HttpExchange t) {
-		// TODO Auto-generated method stub
+		Headers h = t.getRequestHeaders();
+		String fileID = h.getFirst("File_ID");
 		
+		try {
+			if (fileID == null) {
+				t.sendResponseHeaders(400, -1);
+				return;
+			}
+
+			/* Check for file locally */
+			File dbDir = new File("database");
+			File file2delete = new File(dbDir.getName() + "//" + fileID);
+			
+			if (file2delete.exists() && !file2delete.isDirectory())
+				file2delete.delete();
+			
+			/* TODO: send delete command to other peers */
+
+			if (!file2delete.exists()) {
+				t.sendResponseHeaders(200, 0);
+				return;
+			}
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+			return;
+		}
 	}
 
 	private void download(HttpExchange t) {
@@ -219,10 +240,6 @@ public class ClientHandler implements HttpHandler {
 	        is.close();
 	        os.close();
 	    }
-		
-	}
-
-	private void list(HttpExchange t) {
 		
 	}
 

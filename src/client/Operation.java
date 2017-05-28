@@ -48,13 +48,7 @@ public class Operation {
 				download(url, httpConnection, response);
 				break;
 			case "DELETE":
-				/* TODO: dar ordem de apagar o ficheiro */
-				/*
-				url = "http://" + server_address + ":" + server_port + "/client/" + operative;
-				httpConnection = (HttpURLConnection) new URL(url).openConnection();
-				httpConnection.setRequestMethod("DELETE");
-				response = httpConnection.getInputStream();
-*/
+				delete(url, httpConnection, response);
 				break;
 			case "LIST":
 				/* TODO: pedir listagem de ficheiros */
@@ -64,7 +58,7 @@ public class Operation {
 				httpConnection = (HttpURLConnection) new URL(url).openConnection();
 
 				response = httpConnection.getInputStream();
-*/
+				*/
 				break;
 			default:
 				System.out.println("ERROR: Impossible state reached.");
@@ -82,8 +76,29 @@ public class Operation {
 		
 	}
 
+	private void delete(String url, HttpURLConnection httpConnection, InputStream response) throws MalformedURLException, IOException {
+		url = "http://" + server_address + ":" + server_port + "/client/file";
+		httpConnection = (HttpURLConnection) new URL(url).openConnection();
+
+		/* Create header */
+		httpConnection.setRequestMethod("DELETE");
+		httpConnection.setRequestProperty("File_ID", operative);
+
+		/* Get Response */
+		int responseCode = httpConnection.getResponseCode();
+		if(responseCode == 400){
+			System.out.println("Server Response: " + responseCode + " Bad Request - no FileID received.");
+		} else if(responseCode == 200){
+			System.out.println("Server Response: " + responseCode + " Delete order has been issued.");
+		} else {
+			System.out.println("Unexpected Server Response:");
+			for (java.util.Map.Entry<String, List<String>> header : httpConnection.getHeaderFields().entrySet()) {
+				System.out.println(header.getKey() + "=" + header.getValue());
+			}
+		}
+	}
+
 	private void download(String url, HttpURLConnection httpConnection, InputStream response) throws MalformedURLException, IOException {
-		/* TODO: receber ficheiro do server */
 		url = "http://" + server_address + ":" + server_port + "/client/file";
 		httpConnection = (HttpURLConnection) new URL(url).openConnection();
 
@@ -93,9 +108,8 @@ public class Operation {
 
 		/* Get Response */
 		int responseCode = httpConnection.getResponseCode();
-		
 		if(responseCode == 400){
-			System.out.println("Server Response: " + responseCode + " Bad Request - no FileID received");
+			System.out.println("Server Response: " + responseCode + " Bad Request - no FileID received.");
 		} else if(responseCode == 204){
 			System.out.println("Server Response: " + responseCode + " File does not exist withing the network.");
 		} else if(responseCode == 200){
