@@ -205,7 +205,7 @@ public class ClientHandler implements HttpHandler {
 		try { os.close(); } catch (IOException e) { }
 
 		String msgID = IdGenerator.nextId();
-		Peer.share(msgID, fileID, tempFile);
+		Requests.share(msgID, fileID, tempFile);
 		
 	    /* TODO: DELETE AFTER share(fileID, tempFile); IMPLEMENTATION */
 		File dbDir = new File("database");
