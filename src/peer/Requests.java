@@ -2,6 +2,7 @@ package peer;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -71,22 +72,8 @@ public class Requests {
 		}
 		return 400;
 	}
-	
-	protected static void share(String messageID, String fileID, File tempFile) throws MalformedURLException, IOException {
-		/* TODO: Start Upload protocol/thread
-		 * 2. Waits a random amount of time between 0 and 400 ms.
-    			While counting the number of saved_file responses with same requestID (n_saved)
-		 * 3. Decides on weather or not to save file based on a chance.
-    			It has a cts% of saving the file, where cts = (n_pir-n_saved)/n_pir
-    			if (n_pir == 2) {
-					cts = (n_pir-n_saved+1)/(n_pir+1)
-				}
-		 * 4. Sends a saved_file to all peers in range
-		 * 
-		 * For now, it saves the file in /database/ folder
-		 * 
-		 * */
-		
+
+	protected static void forward(String messageID, String fileID, File tempFile) throws MalformedURLException, IOException {
 		/* New message */
 		Peer.addMessageReceived(messageID);
 		
@@ -108,7 +95,7 @@ public class Requests {
 			/* Create header */
 			httpConnection.setRequestMethod("PUT");
 			httpConnection.setRequestProperty("Message_ID", messageID);
-			httpConnection.setRequestProperty("File_ID", tempFile.getName());
+			httpConnection.setRequestProperty("File_ID", fileID);
 			httpConnection.setRequestProperty("File_Length", new Long(tempFile.length()).toString());
 
 			OutputStream os = httpConnection.getOutputStream();
@@ -153,7 +140,7 @@ public class Requests {
 		try { TimeUnit.MILLISECONDS.sleep(time); } catch (InterruptedException e) {}
 		
 		/* Roll dice to save or not */
-		int saved_msgs = getSavedMessagesCounter();
+		int saved_msgs = Peer.getSavedMessagesCounter(messageID);
 		int pir = Peer.getPeersInRange().size();
 		int cts = 0;
 		if (pir < 2)
@@ -164,12 +151,65 @@ public class Requests {
 		int randomInt = rng.nextInt(1001);
 		if (randomInt <= cts) {
 			/* Save File */
+
+			File dbDir = new File("database");
+			
+			if (!dbDir.exists() || !dbDir.isDirectory())
+				dbDir.mkdir();
+
+			File savedFile = new File(dbDir.getName() + "//" + fileID);
+			
+		    FileInputStream is = null;
+			FileOutputStream os = null;
+			try {
+		        is = new FileInputStream(tempFile);
+		        os = new FileOutputStream(savedFile);
+		        byte[] buffer = new byte[1024];
+		        int length;
+		        while ((length = is.read(buffer)) > 0) {
+		            os.write(buffer, 0, length);
+		        }
+		    } finally {
+		        is.close();
+		        os.close();
+		    }
 			
 			/* Send Save Message */
+			sendSavedMessage(messageID, fileID);
 		}
 		
 		/* Delete temporary file */
 		tempFile.delete();
 	}
 
+	private static void sendSavedMessage(String messageID, String fileID) throws MalformedURLException, IOException {
+		/* Sending save request */
+		HttpURLConnection httpConnection = null;
+		String url;
+
+		for (Entry<String, PeerInRange> entry : Peer.getPeersInRange().entrySet()) {
+			PeerInRange peer = entry.getValue();
+			url = "http://" + peer.getIp().toString() + ":" + peer.getPort() + "/fileStored";
+			httpConnection = (HttpURLConnection) new URL(url).openConnection();
+
+			/* Create header */
+			httpConnection.setRequestMethod("POST");
+			httpConnection.setRequestProperty("Message_ID", messageID);
+			httpConnection.setRequestProperty("File_ID", fileID);
+
+			/* Get Response */
+			int responseCode = httpConnection.getResponseCode();
+			if(responseCode == 205){
+				System.out.println("Server Response: " + responseCode + " Message " + messageID + " ignored.");
+			} else if(responseCode == 200){
+				System.out.println("Server Response: " + responseCode + " File save acknowledged ");
+			} else {
+				System.out.println("Unexpected Server Response:");
+				for (java.util.Map.Entry<String, List<String>> header : httpConnection.getHeaderFields().entrySet()) {
+					System.out.println(header.getKey() + "=" + header.getValue());
+				}
+			}
+		}
+		
+	}
 }

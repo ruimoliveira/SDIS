@@ -7,12 +7,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.List;
-import java.util.Scanner;
-import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
 import com.sun.net.httpserver.Headers;
@@ -152,11 +146,11 @@ public class ClientHandler implements HttpHandler {
 	private void upload(HttpExchange t) throws IOException {
 		Headers h = t.getRequestHeaders();
 		String file_length = h.getFirst("File_Length");
-		//String file_name = h.getFirst("File_Name");
 		String fileID = IdGenerator.nextId();
 
 		InputStream is = t.getRequestBody();
 		
+		/* Create file to share */
 		File dir = new File("tempFiles");
 		
 		if (!dir.exists() || !dir.isDirectory())
@@ -173,8 +167,8 @@ public class ClientHandler implements HttpHandler {
 			return;
 		}
 		
+		/* Get file from message */
 		OutputStream os = null;
-		
 	    try {
 			os = new FileOutputStream(tempFile);
 			byte[] body = new byte[(int) Long.parseLong(file_length)];
@@ -204,30 +198,11 @@ public class ClientHandler implements HttpHandler {
 		
 		try { os.close(); } catch (IOException e) { }
 
+		/* Forward file with other peers */
 		String msgID = IdGenerator.nextId();
-		Requests.share(msgID, fileID, tempFile);
-		
-	    /* TODO: DELETE AFTER share(fileID, tempFile); IMPLEMENTATION */
-		File dbDir = new File("database");
-		
-		if (!dbDir.exists() || !dbDir.isDirectory())
-			dbDir.mkdir();
-
-		File savedFile = new File(dbDir.getName() + "//" + fileID);
-		
-	    try {
-	        is = new FileInputStream(tempFile);
-	        os = new FileOutputStream(savedFile);
-	        byte[] buffer = new byte[1024];
-	        int length;
-	        while ((length = is.read(buffer)) > 0) {
-	            os.write(buffer, 0, length);
-	        }
-	    } finally {
-	        is.close();
-	        os.close();
-	    }
-	    /* TODO: DELETE AFTER share(fileID, tempFile); IMPLEMENTATION */
+		Peer.addMessageReceived(msgID);
+		Peer.addStoredMessageReceived(msgID);
+		Requests.forward(msgID, fileID, tempFile);
 		
 	}
 

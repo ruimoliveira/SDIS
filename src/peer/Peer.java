@@ -1,4 +1,5 @@
 package peer;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Timer;
@@ -16,7 +17,8 @@ public class Peer
 {
 	private static String id = null;
 	private static ConcurrentHashMap<String, PeerInRange> peersInRange = new ConcurrentHashMap<String, PeerInRange>();
-	private static ConcurrentHashMap<String, Long> messagesReceived = new ConcurrentHashMap<String, Long>();
+	static ConcurrentHashMap<String, Long> messagesReceived = new ConcurrentHashMap<String, Long>();
+	static ConcurrentHashMap<String, Integer> storedMSGSreceived = new ConcurrentHashMap<String, Integer>();
 			
 	public static void main(String[] args) throws IOException
 	{
@@ -48,7 +50,7 @@ public class Peer
         
         //Initiate messages cleaner thread
     	Timer timer = new Timer();
-    	timer.schedule(new MessagesCleanerTask(300000), 0, 30000);            
+    	timer.schedule(new MessagesCleanerTask(300000), 0, 30000);
     }
 	
 	protected static String getId(){
@@ -80,11 +82,37 @@ public class Peer
     	
         public void run()
         {        	
+        	String aux = null;
     		for(Entry<String, Long> entry : messagesReceived.entrySet())
     		{
     			if (entry.getValue() + milisecs < System.currentTimeMillis())
+    			{
+    				aux = entry.getKey();
     				messagesReceived.remove(entry.getKey());
+    			}
+    		}
+    		
+    		for(Entry<String, Integer> entry : storedMSGSreceived.entrySet())
+    		{
+    			if (entry.getKey().compareTo(aux) == 0)
+    				storedMSGSreceived.remove(entry.getKey());
     		}
         }
-    }	
+    }
+	
+	protected static void addStoredMessageReceived(String msgId)
+	{
+		storedMSGSreceived.put(msgId, 0);
+	}
+
+	public static int getSavedMessagesCounter(String messageID)
+	{
+		for(Entry<String, Integer> entry : storedMSGSreceived.entrySet())
+		{
+			if (entry.getKey().compareTo(messageID) == 0)
+				return entry.getValue();
+		}
+		
+		return -1;
+	}
 }

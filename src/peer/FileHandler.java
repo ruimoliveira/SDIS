@@ -2,11 +2,14 @@ package peer;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -162,11 +165,6 @@ public class FileHandler implements HttpHandler {
 		}
 	}
 	
-	private void put(HttpExchange t)
-	{
-
-	}
-	
 	private void post(HttpExchange t)
 	{
 
@@ -219,6 +217,115 @@ public class FileHandler implements HttpHandler {
 		{
 			e.printStackTrace();
 			return;
+		}
+	}
+	
+	@SuppressWarnings("resource")
+	private void put(HttpExchange t)
+	{
+		Headers h = t.getRequestHeaders();
+		String file_length = h.getFirst("File_Length");
+		String fileID = h.getFirst("File_ID");
+
+		InputStream is = t.getRequestBody();
+
+		/* Check if file exists before continuing to creation */
+		File auxFile = new File("database//" + fileID);
+		if (auxFile.exists() && !auxFile.isDirectory() && auxFile.length()>0) {
+			try {
+				t.sendResponseHeaders(205, 0);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			return;
+		}
+		
+		/* Check if already received this transmission from another peer */
+		String msgID = h.getFirst("Message_ID");
+
+		for(Entry<String, Long> entry : Peer.messagesReceived.entrySet())
+		{
+			if (entry.getKey().compareTo(msgID) == 0) {
+				try {
+					t.sendResponseHeaders(205, 0);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				return;
+			}
+		}
+		
+		/* Create temporary file to share */
+		File dir = new File("tempFiles");
+		
+		if (!dir.exists() || !dir.isDirectory())
+			dir.mkdir();
+
+		File tempFile = new File(dir.getName() + "//" + fileID);
+		try {
+			tempFile.createNewFile();
+		} catch (IOException e) {
+			try { t.sendResponseHeaders(500, -1); } catch (IOException e1) {e1.printStackTrace();}
+			e.printStackTrace();
+			tempFile.delete();
+			return;
+		}
+		
+		OutputStream os = null;
+	    try {
+			os = new FileOutputStream(tempFile);
+			byte[] body = new byte[(int) Long.parseLong(file_length)];
+			int bytesRead;
+			while ((bytesRead = is.read(body)) != -1) {
+				os.write(body, 0, bytesRead);
+			}
+			is.read(body);
+		} catch (FileNotFoundException e) {
+			try {
+				t.sendResponseHeaders(500, -1);
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+			e.printStackTrace();
+			tempFile.delete();
+			return;
+		} catch (IOException e) {
+			try {
+				t.sendResponseHeaders(400, -1);
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+			e.printStackTrace();
+			tempFile.delete();
+			return;
+		}
+		
+		try { is.close(); } catch (IOException e) { }
+		try { os.close(); } catch (IOException e) { }
+
+		try {
+			t.sendResponseHeaders(200, 0);
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		os = t.getResponseBody();
+		try {
+			os.write(fileID.getBytes());
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		
+		try { os.close(); } catch (IOException e) { }
+
+		/* Forward file with other peers */
+		Peer.addMessageReceived(msgID);
+		Peer.addStoredMessageReceived(msgID);
+		try {
+			Requests.forward(msgID, fileID, tempFile);
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 }
