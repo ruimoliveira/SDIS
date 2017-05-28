@@ -2,6 +2,7 @@ package client;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -9,6 +10,7 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.List;
@@ -40,53 +42,10 @@ public class Operation {
 
 			switch (operation) {
 			case "UPLOAD":
-				/* Load file */
-				File file = new File(operative);
-				if (!file.exists() || file.isDirectory()) {
-					System.out.println("File does not exist. Exiting...");
-					return;
-				}
-				
-				if (file.length() > oneGB) {
-					System.out.println("File exceeds size limit of 1 GB. Exiting...");
-				}
-				
-				FileInputStream fis = null;
-				fis = new FileInputStream(file);
-				
-				/* Create connection */
-				url = "http://" + server_address + ":" + server_port + "/client";
-				httpConnection = (HttpURLConnection) new URL(url).openConnection();
-				
-				httpConnection.setDoOutput(true);
-				httpConnection.setRequestMethod("PUT");
-				
-				/* Create header */
-				httpConnection.setRequestMethod("PUT");
-				httpConnection.setRequestProperty("File_Name", file.getName());
-				httpConnection.setRequestProperty("File_Length", new Long(file.length()).toString());
-
-				OutputStream os = httpConnection.getOutputStream();
-				
-				byte[] bytes = new byte[1000];
-
-				int n;
-				while((n = fis.read(bytes)) != -1){
-					os.write(bytes, 0, n);
-				}
-				
-				try { fis.close(); } catch (IOException e) { }
-				try { os.close(); } catch (IOException e) { }
-
+				upload(url, httpConnection, response);
 				break;
 			case "DOWNLOAD":
-				/* TODO: receber ficheiro do server */
-				/*
-				url = "http://" + server_address + ":" + server_port + "/client/" + operative;
-				httpConnection = (HttpURLConnection) new URL(url).openConnection();
-
-				response = httpConnection.getInputStream();
-*/
+				download(url, httpConnection, response);
 				break;
 			case "DELETE":
 				/* TODO: dar ordem de apagar o ficheiro */
@@ -112,19 +71,6 @@ public class Operation {
 				return;
 			}
 
-			int status = httpConnection.getResponseCode();
-			System.out.println("Response Code: " + status);
-
-			// HTTP response headers:
-			System.out.println("Response Headers:");
-			for (java.util.Map.Entry<String, List<String>> header : httpConnection.getHeaderFields().entrySet()) {
-				System.out.println(header.getKey() + "=" + header.getValue());
-			}
-
-			try (Scanner scanner = new Scanner(response)) {
-				String responseBody = scanner.useDelimiter("\\A").next();
-				System.out.println("Response Body:\n" + responseBody);
-			}
 
 		} catch (UnsupportedEncodingException e) {
 			e.printStackTrace();
@@ -132,6 +78,115 @@ public class Operation {
 			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
+		}
+		
+	}
+
+	private void download(String url, HttpURLConnection httpConnection, InputStream response) throws MalformedURLException, IOException {
+		/* TODO: receber ficheiro do server */
+		url = "http://" + server_address + ":" + server_port + "/client/file";
+		httpConnection = (HttpURLConnection) new URL(url).openConnection();
+
+		/* Create header */
+		httpConnection.setRequestMethod("GET");
+		httpConnection.setRequestProperty("File_ID", operative);
+
+		/* Get Response */
+		int responseCode = httpConnection.getResponseCode();
+		
+		if(responseCode == 400){
+			System.out.println("Server Response: " + responseCode + " Bad Request - no FileID received");
+		} else if(responseCode == 204){
+			System.out.println("Server Response: " + responseCode + " File does not exist withing the network.");
+		} else if(responseCode == 200){
+			
+			response = httpConnection.getInputStream();			
+			FileOutputStream stream = null;
+			try {		
+				stream = new FileOutputStream(new File(operative));
+				byte[] bytes = new byte[1000];
+				
+				int n;
+				while((n = response.read(bytes)) != -1){
+					stream.write(bytes, 0, n);
+				}
+			}
+			catch(Exception e)
+			{
+				System.out.println(e);
+				return;
+			}
+			finally{
+				try { stream.close(); } catch (IOException e) { }
+			}
+			System.out.println("File received!");
+			
+		} else {
+			System.out.println("Unexpected Server Response:");
+			for (java.util.Map.Entry<String, List<String>> header : httpConnection.getHeaderFields().entrySet()) {
+				System.out.println(header.getKey() + "=" + header.getValue());
+			}
+		}
+		
+	}
+
+	private void upload(String url, HttpURLConnection httpConnection, InputStream response) throws IOException {
+		/* Load file */
+		File file = new File(operative);
+		if (!file.exists() || file.isDirectory()) {
+			System.out.println("File does not exist. Exiting...");
+			return;
+		}
+		
+		if (file.length() > oneGB) {
+			System.out.println("File exceeds size limit of 1 GB. Exiting...");
+		}
+		
+		FileInputStream fis = null;
+		fis = new FileInputStream(file);
+		
+		/* Create connection */
+		url = "http://" + server_address + ":" + server_port + "/client";
+		httpConnection = (HttpURLConnection) new URL(url).openConnection();
+		
+		httpConnection.setDoOutput(true);
+		
+		/* Create header */
+		httpConnection.setRequestMethod("PUT");
+		httpConnection.setRequestProperty("File_Name", file.getName());
+		httpConnection.setRequestProperty("File_Length", new Long(file.length()).toString());
+
+		OutputStream os = httpConnection.getOutputStream();
+		
+		byte[] bytes = new byte[1000];
+
+		int n;
+		while((n = fis.read(bytes)) != -1){
+			os.write(bytes, 0, n);
+		}
+		
+		try { fis.close(); } catch (IOException e) { }
+		try { os.close(); } catch (IOException e) { }
+
+		/* Response */
+		response = httpConnection.getInputStream();
+		int responseCode = httpConnection.getResponseCode();
+
+		if(responseCode == 500){
+			System.out.println("Server Response: " + responseCode + " Internal Server Error.");
+		} else if(responseCode == 400){
+			System.out.println("Server Response: " + responseCode + " Bad Request.");
+		} else if(responseCode == 200){
+			String responseBody;
+			try (Scanner scanner = new Scanner(response)) {
+				responseBody = scanner.useDelimiter("\\A").next();
+			}
+			System.out.println("File Uploaded! Your file's shareID is: " + responseBody);
+		} else {
+			System.out.println("Unexpected Server Response:");
+			for (java.util.Map.Entry<String, List<String>> header : httpConnection.getHeaderFields().entrySet()) {
+				System.out.println(header.getKey() + "=" + header.getValue());
+			}
 		}
 		
 	}
