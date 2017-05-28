@@ -1,6 +1,5 @@
 package peer;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,6 +12,8 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.Map.Entry;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +27,7 @@ public class Peer
 {
 	private static String id = null;
 	private static ConcurrentHashMap<String, PeerInRange> peersInRange = new ConcurrentHashMap<String, PeerInRange>();
+	private static ConcurrentHashMap<String, Long> messagesReceived = new ConcurrentHashMap<String, Long>();
 			
 	public static void main(String[] args) throws IOException
 	{
@@ -47,14 +49,19 @@ public class Peer
 			e.printStackTrace();
 		}
 		
-		//Initiate advertise thread
+		//Initiate server port advertise thread
         Thread advertiseThread = new PeerAdvertiseThread("advertiser", 7000, httpServerPort);
         advertiseThread.start();
         
-        //Initiate advertise thread
+        //Initiate peers in range listener thread
         Thread listenerThread = new PeerListenerThread("listener", 7000);
         listenerThread.start();
-                
+        
+        //Initiate messages cleaner thread
+    	Timer timer = new Timer();
+    	timer.schedule(new MessagesCleanerTask(300000), 0, 30000);
+            
+    	//Tests
         while(peersInRange.isEmpty()){
         	try {
 				Thread.sleep(1000);
@@ -94,6 +101,34 @@ public class Peer
 		}
 		System.out.println();
 	}
+	
+	protected static boolean isMessageReceived(String msgId)
+	{
+		return messagesReceived.containsKey(msgId);
+	}
+	
+	protected static void addMessageReceived(String msgId)
+	{
+		messagesReceived.put(msgId, System.currentTimeMillis());
+	}
+	
+    static class MessagesCleanerTask extends TimerTask
+    {
+    	long milisecs;
+    	
+    	public MessagesCleanerTask(long milisecs){
+    		this.milisecs = milisecs;
+    	}
+    	
+        public void run()
+        {        	
+    		for(Entry<String, Long> entry : messagesReceived.entrySet())
+    		{
+    			if (entry.getValue() + milisecs < System.currentTimeMillis())
+    				messagesReceived.remove(entry.getKey());
+    		}
+        }
+    }
 	
 	private static void testServer()
 	{
