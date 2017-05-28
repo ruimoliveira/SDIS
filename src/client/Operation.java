@@ -159,6 +159,7 @@ public class Operation {
 		/* Create connection */
 		url = "http://" + server_address + ":" + server_port + "/client";
 		httpConnection = (HttpURLConnection) new URL(url).openConnection();
+		httpConnection.setChunkedStreamingMode(1024);
 		
 		httpConnection.setDoOutput(true);
 		

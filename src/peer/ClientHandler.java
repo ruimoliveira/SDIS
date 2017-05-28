@@ -7,6 +7,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.List;
+import java.util.Scanner;
+import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
 import com.sun.net.httpserver.Headers;
@@ -137,14 +143,8 @@ public class ClientHandler implements HttpHandler {
 			e.printStackTrace();
 			return;
 		} finally {
-			try {
-				fs.close();
-			} catch (IOException e) {
-			}
-			try {
-				os.close();
-			} catch (IOException e) {
-			}
+			try { fs.close(); } catch (IOException e) {}
+			try { os.close(); } catch (IOException e) {}
 		}
 	}
 
@@ -203,24 +203,11 @@ public class ClientHandler implements HttpHandler {
 		os.write(fileID.getBytes());
 		
 		try { os.close(); } catch (IOException e) { }
+
+		String msgID = IdGenerator.nextId();
+		Peer.share(msgID, fileID, tempFile);
 		
-		
-		/* TODO: Start Upload protocol/thread
-		 * 1. Retransmits save_request to all peers in range (number of peers in rage = n_pir)
-		 * 2. Waits a random amount of time between 0 and 400 ms.
-    			While counting the number of saved_file responses with same requestID (n_saved)
-		 * 3. Decides on weather or not to save file based on a chance.
-    			It has a cts% of saving the file, where cts = (n_pir-n_saved)/n_pir
-    			if (n_pir == 2) {
-					cts = (n_pir-n_saved+1)/(n_pir+1)
-				}
-		 * 4. Sends a saved_file to all peers in range
-		 * 5. Delete tempFile
-		 * 
-		 * For now, it saves the file in /database/ folder
-		 * 
-		 * */
-		
+	    /* TODO: DELETE AFTER share(fileID, tempFile); IMPLEMENTATION */
 		File dbDir = new File("database");
 		
 		if (!dbDir.exists() || !dbDir.isDirectory())
@@ -240,6 +227,7 @@ public class ClientHandler implements HttpHandler {
 	        is.close();
 	        os.close();
 	    }
+	    /* TODO: DELETE AFTER share(fileID, tempFile); IMPLEMENTATION */
 		
 	}
 
