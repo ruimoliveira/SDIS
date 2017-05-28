@@ -39,6 +39,7 @@ public class Peer
 			HttpServer server = HttpServer.create(new InetSocketAddress(httpServerPort), 0);
 			server.createContext("/file", new FileHandler());
 			server.createContext("/files", new FilesHandler());
+			server.createContext("/fileStored", new StoredHandler());
 			server.createContext("/test", new TestHandler());
 			server.createContext("/client", new ClientHandler());
 			server.setExecutor(new ThreadPoolExecutor(4, 8, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(100)));
