@@ -97,11 +97,23 @@ public class FileHandler implements HttpHandler {
 		try {
 			String fileId = queryParams.get("id");
 			String msgId = queryParams.get("msg");
-			if(fileId == null || msgId == null)
+			String peerId = queryParams.get("peer");
+			
+			if(fileId == null || msgId == null || peerId == null)
 			{
+				//invalid args
 				t.sendResponseHeaders(400, -1);
 				return;
 			}
+			
+			if(Peer.isMessageReceived(msgId))
+			{
+				//already received message
+				t.sendResponseHeaders(205, -1);
+				return;
+			}
+			
+			Peer.addMessageReceived(msgId);
 					
 			File dir = new File("Files");
 			File file = new File(dir, fileId);
@@ -112,13 +124,13 @@ public class FileHandler implements HttpHandler {
 			}			
 			else
 			{
-				//ask other peers
+				//ask other peers for the file
 				boolean foundFile = false; 
 				ConcurrentHashMap<String, PeerInRange> peersInRange = Peer.getPeersInRange();
 				for(Entry<String, PeerInRange> entry : peersInRange.entrySet())
 				{
 					PeerInRange peer = entry.getValue();
-					if(Requests.getFile(peer.getIp().getHostAddress(), peer.getPort(), fileId, msgId, is) == 200){
+					if(peerId != Peer.getId() && Requests.getFile(peer.getIp().getHostAddress(), peer.getPort(), fileId, msgId, is) == 200){
 						foundFile = true;
 						break;
 					}
@@ -162,6 +174,51 @@ public class FileHandler implements HttpHandler {
 	
 	private void delete(HttpExchange t)
 	{
-
+		try {
+			String fileId = queryParams.get("id");
+			String msgId = queryParams.get("msg");
+			String peerId = queryParams.get("peer");
+			
+			if(fileId == null || msgId == null || peerId == null)
+			{
+				//invalid args
+				t.sendResponseHeaders(400, -1);
+				return;
+			}
+			
+			if(Peer.isMessageReceived(msgId))
+			{
+				//already received message
+				t.sendResponseHeaders(205, -1);
+				return;
+			}
+			
+			Peer.addMessageReceived(msgId);
+					
+			//ask other peers to delete the file
+			ConcurrentHashMap<String, PeerInRange> peersInRange = Peer.getPeersInRange();
+			for(Entry<String, PeerInRange> entry : peersInRange.entrySet())
+			{
+				PeerInRange peer = entry.getValue();
+				if(peerId != Peer.getId()){
+					Requests.deleteFile(peer.getIp().getHostAddress(), peer.getPort(), fileId, msgId);
+				}
+			}
+			
+			File dir = new File("Files");
+			File file = new File(dir, fileId);
+			
+			if(file.exists() && !file.isDirectory())
+			{
+				file.delete();
+			}
+			
+			t.sendResponseHeaders(200, -1);
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+			return;
+		}
 	}
 }

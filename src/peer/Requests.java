@@ -24,11 +24,11 @@ public class Requests {
 		String charset = java.nio.charset.StandardCharsets.UTF_8.name();		
 		try
 		{
-			url += "?" + String.format("id=%s&msg=%s&peer=%s", URLEncoder.encode(fileId, charset), URLEncoder.encode(msgId, charset), URLEncoder.encode(Peer.getId(), charset));
+			url += "?" + String.format("id=%s&msg=%s&peer=%s", URLEncoder.encode(fileId, charset), URLEncoder.encode(msgId, charset), URLEncoder.encode(Peer.getId(), charset));			
 			
 			HttpURLConnection httpConnection = null;
-
 			httpConnection = (HttpURLConnection) new URL(url).openConnection();
+			
 			int status = httpConnection.getResponseCode();
 			if (status == 200)
 				inputStream = httpConnection.getInputStream();
@@ -45,7 +45,33 @@ public class Requests {
 		}
 		return 400;
 	}
+	
+	protected static int deleteFile(String peer, int port, String fileId, String msgId)
+	{
+		String url = "http://" + peer + ":" + port + "/file";
+		String charset = java.nio.charset.StandardCharsets.UTF_8.name();		
+		try
+		{
+			url += "?" + String.format("id=%s&msg=%s&peer=%s", URLEncoder.encode(fileId, charset), URLEncoder.encode(msgId, charset), URLEncoder.encode(Peer.getId(), charset));
+			
+			HttpURLConnection httpConnection = null;
+			httpConnection = (HttpURLConnection) new URL(url).openConnection();			
+			httpConnection.setRequestMethod("PUT");
+			
+			int status = httpConnection.getResponseCode();
+			return status;
 
+		}
+		catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return 400;
+	}
+	
 	protected static void share(String messageID, String fileID, File tempFile) throws MalformedURLException, IOException {
 		/* TODO: Start Upload protocol/thread
 		 * 2. Waits a random amount of time between 0 and 400 ms.
@@ -145,4 +171,5 @@ public class Requests {
 		/* Delete temporary file */
 		tempFile.delete();
 	}
+
 }
