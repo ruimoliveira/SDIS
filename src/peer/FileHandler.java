@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -91,11 +92,12 @@ public class FileHandler implements HttpHandler {
 	
 	private void get(HttpExchange t)
 	{
-		FileInputStream fs = null;
+		InputStream is = null;
 		OutputStream os = null;
 		try {
 			String fileId = queryParams.get("id");
-			if(fileId == null)
+			String msgId = queryParams.get("msg");
+			if(fileId == null || msgId == null)
 			{
 				t.sendResponseHeaders(400, -1);
 				return;
@@ -104,20 +106,36 @@ public class FileHandler implements HttpHandler {
 			File dir = new File("Files");
 			File file = new File(dir, fileId);
 			
-			if(!file.exists() || file.isDirectory())
+			if(file.exists() && !file.isDirectory())
 			{
-				t.sendResponseHeaders(204, -1);
-				return;
+				is = new FileInputStream(file);
+			}			
+			else
+			{
+				//ask other peers
+				boolean foundFile = false; 
+				ConcurrentHashMap<String, PeerInRange> peersInRange = Peer.getPeersInRange();
+				for(Entry<String, PeerInRange> entry : peersInRange.entrySet())
+				{
+					PeerInRange peer = entry.getValue();
+					if(Requests.getFile(peer.getIp().getHostAddress(), peer.getPort(), fileId, msgId, is) == 200){
+						foundFile = true;
+						break;
+					}
+				}
+				if(!foundFile){
+					t.sendResponseHeaders(204, -1);
+					return;
+				}
 			}
 
 			t.sendResponseHeaders(200, 0);
 			os = t.getResponseBody();
 
-			fs = new FileInputStream(file);
 			byte[] bytes = new byte[1000];
 
 			int n;
-			while((n = fs.read(bytes)) != -1){
+			while((n = is.read(bytes)) != -1){
 				os.write(bytes, 0, n);
 			}
 		}
@@ -127,7 +145,7 @@ public class FileHandler implements HttpHandler {
 			return;
 		}
 		finally{
-			try { fs.close(); } catch (IOException e) { }
+			try { is.close(); } catch (IOException e) { }
 			try { os.close(); } catch (IOException e) { }
 		}
 	}
