@@ -27,6 +27,7 @@ public class ClientHandler implements HttpHandler {
 			switch (method) {
 			case "PUT":
 				try {
+					System.out.println("ClientHandler: Received upload request from client.");
 					upload(t);
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -59,7 +60,7 @@ public class ClientHandler implements HttpHandler {
 			}
 
 			/* Check for file locally */
-			File dbDir = new File("database");
+			File dbDir = new File("database" + Peer.getId());
 			File file2delete = new File(dbDir.getName() + "//" + fileID);
 			
 			if (file2delete.exists() && !file2delete.isDirectory())
@@ -92,12 +93,12 @@ public class ClientHandler implements HttpHandler {
 			}
 
 			/* Check for file locally */
-			File dbDir = new File("database");
+			File dbDir = new File("database" + Peer.getId());
 			File fileRequested = new File(dbDir.getName() + "//" + fileID);
 
 			if (!fileRequested.exists() || fileRequested.isDirectory()) {
 				/* Check for file abroad */
-				File dir = new File("tempFiles");
+				File dir = new File("tempFiles" + Peer.getId());
 				if (!dir.exists() || !dir.isDirectory())
 					dir.mkdir();
 				fileRequested = new File(dir.getName() + "//" + fileID);
@@ -151,7 +152,7 @@ public class ClientHandler implements HttpHandler {
 		InputStream is = t.getRequestBody();
 		
 		/* Create file to share */
-		File dir = new File("tempFiles");
+		File dir = new File("tempFiles" + Peer.getId());
 		
 		if (!dir.exists() || !dir.isDirectory())
 			dir.mkdir();
@@ -202,7 +203,8 @@ public class ClientHandler implements HttpHandler {
 		String msgID = IdGenerator.nextId();
 		Peer.addMessageReceived(msgID);
 		Peer.addStoredMessageReceived(msgID);
-		Requests.forward(msgID, fileID, tempFile);
+		String senderID = Peer.getId();
+		Requests.forward(msgID, fileID, senderID, tempFile);
 		
 	}
 

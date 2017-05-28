@@ -57,33 +57,7 @@ public class FileHandler implements HttpHandler {
 		} catch (UnsupportedEncodingException e1) {
 			e1.printStackTrace();
 		};
-
-
-		//Request Body
-		InputStream is = t.getRequestBody();        
-		InputStreamReader isr = null;
-		BufferedReader br = null;
-		try {
-			isr = new InputStreamReader(is,"utf-8");
-			br = new BufferedReader(isr);
-
-			int b;
-			StringBuilder buf = new StringBuilder(512);
-			while ((b = br.read()) != -1) {
-				buf.append((char) b);
-			}
-			
-			br.close();
-			isr.close();
-			
-			System.out.println("Request Body:\n" + buf.toString());
-			System.out.println();		
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
+		
 		switch(method)
 		{
 		case "GET": get(t);	break;
@@ -224,13 +198,15 @@ public class FileHandler implements HttpHandler {
 	private void put(HttpExchange t)
 	{
 		Headers h = t.getRequestHeaders();
+		String fileID = queryParams.get("id");
+		String msgID = queryParams.get("msg");
+		String senderID = queryParams.get("peer");
 		String file_length = h.getFirst("File_Length");
-		String fileID = h.getFirst("File_ID");
 
 		InputStream is = t.getRequestBody();
 
 		/* Check if file exists before continuing to creation */
-		File auxFile = new File("database//" + fileID);
+		File auxFile = new File("database" + Peer.getId() + "//" + fileID);
 		if (auxFile.exists() && !auxFile.isDirectory() && auxFile.length()>0) {
 			try {
 				t.sendResponseHeaders(205, 0);
@@ -241,8 +217,6 @@ public class FileHandler implements HttpHandler {
 		}
 		
 		/* Check if already received this transmission from another peer */
-		String msgID = h.getFirst("Message_ID");
-
 		for(Entry<String, Long> entry : Peer.messagesReceived.entrySet())
 		{
 			if (entry.getKey().compareTo(msgID) == 0) {
@@ -256,7 +230,7 @@ public class FileHandler implements HttpHandler {
 		}
 		
 		/* Create temporary file to share */
-		File dir = new File("tempFiles");
+		File dir = new File("tempFiles" + Peer.getId());
 		
 		if (!dir.exists() || !dir.isDirectory())
 			dir.mkdir();
@@ -321,7 +295,7 @@ public class FileHandler implements HttpHandler {
 		Peer.addMessageReceived(msgID);
 		Peer.addStoredMessageReceived(msgID);
 		try {
-			Requests.forward(msgID, fileID, tempFile);
+			Requests.forward(msgID, fileID, senderID, tempFile);
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
 		} catch (IOException e) {

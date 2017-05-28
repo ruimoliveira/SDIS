@@ -13,7 +13,6 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.List;
 import java.util.Random;
-import java.util.Scanner;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
@@ -73,20 +72,26 @@ public class Requests {
 		return 400;
 	}
 
-	protected static void forward(String messageID, String fileID, File tempFile) throws MalformedURLException, IOException {
+	protected static void forward(String messageID, String fileID, String senderID, File tempFile) throws MalformedURLException, IOException {
 		/* New message */
 		Peer.addMessageReceived(messageID);
+		String charset = java.nio.charset.StandardCharsets.UTF_8.name();	
 		
 		/* Sending save request */
 		HttpURLConnection httpConnection = null;
-		InputStream response = null;
 		FileInputStream fis = null;
-		fis = new FileInputStream(tempFile);
 		String url;
 
 		for (Entry<String, PeerInRange> entry : Peer.getPeersInRange().entrySet()) {
+			fis = new FileInputStream(tempFile);
+			
+			if (entry.getKey().compareTo(senderID) == 0)
+				continue;
 			PeerInRange peer = entry.getValue();
-			url = "http://" + peer.getIp().toString() + ":" + peer.getPort() + "/file";
+			url = "http:/" + peer.getIp().toString() + ":" + peer.getPort() + "/file";
+			url += "?" + String.format("id=%s&msg=%s&peer=%s", URLEncoder.encode(fileID, charset),
+					URLEncoder.encode(messageID, charset), URLEncoder.encode(Peer.getId(), charset));
+			System.out.println("URL: " + url);
 			httpConnection = (HttpURLConnection) new URL(url).openConnection();
 			httpConnection.setChunkedStreamingMode(1024);
 
@@ -94,8 +99,6 @@ public class Requests {
 
 			/* Create header */
 			httpConnection.setRequestMethod("PUT");
-			httpConnection.setRequestProperty("Message_ID", messageID);
-			httpConnection.setRequestProperty("File_ID", fileID);
 			httpConnection.setRequestProperty("File_Length", new Long(tempFile.length()).toString());
 
 			OutputStream os = httpConnection.getOutputStream();
@@ -111,20 +114,14 @@ public class Requests {
 			try { os.close(); } catch (IOException e) { }
 	
 			/* Response */
-			response = httpConnection.getInputStream();
 			int responseCode = httpConnection.getResponseCode();
-	
 			if(responseCode == 500){
 				System.out.println("Server Response: " + responseCode + " Internal Server Error.");
 			} else if(responseCode == 400){
 				System.out.println("Server Response: " + responseCode + " Bad Request.");
 			} else if(responseCode == 205){
 				System.out.println("Server Response: " + responseCode + " Message " + messageID + " already received.");
-			} else if(responseCode == 200){
-				String responseBody;
-				try (Scanner scanner = new Scanner(response)) {
-					responseBody = scanner.useDelimiter("\\A").next();
-				}
+			} if(responseCode == 200){
 				System.out.println("Server Response: " + responseCode + " File for retransmition received.");
 			} else {
 				System.out.println("Unexpected Server Response:");
@@ -136,23 +133,30 @@ public class Requests {
 
 		/* Give a chance for other peers to save before deciding to save */
 	    Random rng = new Random();
-		int time = rng.nextInt(401);
+		int time = rng.nextInt(501);
 		try { TimeUnit.MILLISECONDS.sleep(time); } catch (InterruptedException e) {}
 		
 		/* Roll dice to save or not */
 		int saved_msgs = Peer.getSavedMessagesCounter(messageID);
 		int pir = Peer.getPeersInRange().size();
-		int cts = 0;
-		if (pir < 2)
-			cts = (pir - saved_msgs + 1) / (pir + 1) * 100;
-		else
-			cts = (pir - saved_msgs) / (pir) * 1000;
+		int cts;
+		if (pir == 1) {
+			cts = (pir - saved_msgs + 2) * 1000 / (pir + 2);
+			System.out.println("cts = " + (pir - saved_msgs + 2) + "/" + (pir + 2));
+		} else {
+			cts = (pir - saved_msgs) * 1000 / (pir + 1);
+			System.out.println("cts = " + (pir - saved_msgs + 1) + "/" + (pir + 1));
+		}
 
 		int randomInt = rng.nextInt(1001);
+		System.out.println("pir: " + pir);
+		System.out.println("saved_msgs: " + saved_msgs);
+		System.out.println("cts: " + cts);
+		System.out.println("randomInt: " + randomInt);
+		
 		if (randomInt <= cts) {
 			/* Save File */
-
-			File dbDir = new File("database");
+			File dbDir = new File("database" + Peer.getId());
 			
 			if (!dbDir.exists() || !dbDir.isDirectory())
 				dbDir.mkdir();

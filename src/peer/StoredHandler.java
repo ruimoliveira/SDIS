@@ -1,7 +1,6 @@
 package peer;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Map.Entry;
 
 import com.sun.net.httpserver.Headers;
@@ -28,7 +27,7 @@ public class StoredHandler implements HttpHandler {
 		String fileID = IdGenerator.nextId();
 
 		/* Check if file exists before continuing to creation */
-		File auxFile = new File("database//" + fileID);
+		File auxFile = new File("database" + Peer.getId() + "//" + fileID);
 		if (auxFile.exists() && !auxFile.isDirectory() && auxFile.length()>0) {
 			try {
 				t.sendResponseHeaders(205, 0);

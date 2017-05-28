@@ -11,7 +11,7 @@ public class PeerAdvertiseThread extends Thread
     private DatagramSocket advertiseSocket = null;
     ArrayList<InetAddress> broadcastAddresses = new ArrayList<InetAddress>();
     private int broadcastPort = 7000;
-    private int servicePort = 8000;
+    private int servicePort;
     private boolean running = true;
 
     public PeerAdvertiseThread(String name, int broadcastPort, int servicePort) throws IOException

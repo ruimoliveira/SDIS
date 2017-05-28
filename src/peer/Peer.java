@@ -29,7 +29,7 @@ public class Peer
 		try {
 			HttpServer server = HttpServer.create(new InetSocketAddress(httpServerPort), 0);
 			server.createContext("/file", new FileHandler());
-			server.createContext("/files", new FilesHandler());
+			//server.createContext("/files", new FilesHandler());
 			server.createContext("/fileStored", new StoredHandler());
 			server.createContext("/client", new ClientHandler());
 			server.setExecutor(new ThreadPoolExecutor(4, 8, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(100)));
@@ -83,20 +83,23 @@ public class Peer
         public void run()
         {        	
         	String aux = null;
+        	boolean deleted = false; 
     		for(Entry<String, Long> entry : messagesReceived.entrySet())
     		{
     			if (entry.getValue() + milisecs < System.currentTimeMillis())
     			{
     				aux = entry.getKey();
     				messagesReceived.remove(entry.getKey());
+    				deleted = true;
     			}
     		}
     		
-    		for(Entry<String, Integer> entry : storedMSGSreceived.entrySet())
-    		{
-    			if (entry.getKey().compareTo(aux) == 0)
-    				storedMSGSreceived.remove(entry.getKey());
-    		}
+    		if (deleted)
+	    		for(Entry<String, Integer> entry2 : storedMSGSreceived.entrySet())
+	    		{
+	    			if (entry2.getKey().compareTo(aux) == 0)
+	    				storedMSGSreceived.remove(entry2.getKey());
+	    		}
         }
     }
 	
