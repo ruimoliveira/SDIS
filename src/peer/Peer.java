@@ -38,6 +38,7 @@ public class Peer
 			server.createContext("/file", new FileHandler());
 			server.createContext("/files", new FilesHandler());
 			server.createContext("/test", new TestHandler());
+			server.createContext("/client", new ClientHandler());
 			server.setExecutor(new ThreadPoolExecutor(4, 8, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(100)));
 			server.start();
 			System.out.println("HttpServer started");
