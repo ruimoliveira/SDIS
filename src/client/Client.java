@@ -33,11 +33,12 @@ public class Client {
 			}
 			break;
 		default:
-			System.out.println("Operations supported are: Upload, Download, List and Delete.");
+			System.out.println("Operations supported are: upload, download, list and delete.");
 			return;
 		}
 
-		new Operation(server_address, server_port, operation, operative);
+		Action action = new Action(server_address, server_port, operation, operative);
+		action.run();
 	}
 
 	private static void printUsage() {

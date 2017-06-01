@@ -1,76 +1,65 @@
 package peer;
-import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Map.Entry;
-
-import com.sun.net.httpserver.Headers;
+import java.util.concurrent.ConcurrentHashMap;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
 @SuppressWarnings("restriction")
-public class StoredHandler implements HttpHandler {
-
+public class StoredHandler implements HttpHandler
+{
+	private static String charset = java.nio.charset.StandardCharsets.UTF_8.name();
+	
 	@Override
-	public void handle(HttpExchange t) throws IOException {
+	public void handle(HttpExchange t) throws IOException
+	{
+		/* Parse request query */
+		Map<String, String> queryParams = new HashMap<String, String>();
 
-		String method = t.getRequestMethod();
-		
-		switch (method) {
-		case "POST":
-			stored(t);
-			break;
+		String query = t.getRequestURI().getQuery();
+		if (query != null){
+			query = java.net.URLDecoder.decode(query, charset);
+			queryParams = HttpHandlerUtil.queryToMap(query);
 		}
-	}
 
-	private void stored(HttpExchange t) {
-		Headers h = t.getRequestHeaders();
-		String fileID = IdGenerator.nextId();
-
-		/* Check if file exists before continuing to creation */
-		File auxFile = new File("database" + Peer.getId() + "//" + fileID);
-		if (auxFile.exists() && !auxFile.isDirectory() && auxFile.length()>0) {
-			try {
-				t.sendResponseHeaders(205, 0);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			return;
-		}
+		String fileId = queryParams.get("fileid");
+		String msgId = queryParams.get("msg");
+		String putMsgId = queryParams.get("putmsg");
+		String peerId = queryParams.get("peer");
 		
-		/* Check if already received this transmission from another peer */
-		String msgID = h.getFirst("Message_ID");
-
-		boolean hasMessage = false;
-		for(Entry<String, Long> entry : Peer.messagesReceived.entrySet())
+		if(fileId == null || msgId == null || putMsgId == null || peerId == null)
 		{
-			if (entry.getKey().compareTo(msgID) == 0) {
-				hasMessage = true;
-				break;
-			}
-		}
-
-		if (!hasMessage) {
-			try {
-				t.sendResponseHeaders(205, 0);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			/* invalid args */
+			t.sendResponseHeaders(400, -1);
 			return;
 		}
 
-		for(Entry<String, Integer> entry : Peer.storedMSGSreceived.entrySet())
+		if(Peer.isMessageReceived(msgId))
 		{
-			if (entry.getKey().compareTo(msgID) == 0) {
-				entry.setValue( entry.getValue() + 1 );
+			/* already received message */
+			t.sendResponseHeaders(205, -1);
+			return;
+		}
+		
+		System.out.println("Stored received: " + fileId);
+		
+		Peer.addMessageReceived(msgId);
+		Peer.addStoredReceived(putMsgId);
+		
+		ConcurrentHashMap<String, PeerInRange> peersInRange = Peer.getPeersInRange();
+		for(Entry<String, PeerInRange> entry : peersInRange.entrySet())
+		{
+			PeerInRange peer = entry.getValue();
+			if(!peer.getId().equals(peerId)){
+				Thread thread = new Thread() {
+					public void run(){
+						Requests.stored(peer.getIp().getHostAddress(), peer.getPort(), fileId, msgId, putMsgId);					
+					}  
+				};
+				thread.start();
 			}
 		}
-		
-		try {
-			t.sendResponseHeaders(200, 0);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return;
-		
 	}
 }

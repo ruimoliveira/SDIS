@@ -10,27 +10,18 @@ public class PeerAdvertiseThread extends Thread
 {
     private DatagramSocket advertiseSocket = null;
     ArrayList<InetAddress> broadcastAddresses = new ArrayList<InetAddress>();
-    private int broadcastPort = 7000;
+    private int broadcastPort;
     private int servicePort;
     private boolean running = true;
 
     public PeerAdvertiseThread(String name, int broadcastPort, int servicePort) throws IOException
     {
         super(name);
-        
-        // create an unbound socket
         advertiseSocket = new DatagramSocket(null);
-
-        // make it possible to bind several sockets to the same port
         advertiseSocket.setReuseAddress(true);
-
-        // might not be necessary, but for clarity
         advertiseSocket.setBroadcast(true);
-
-        advertiseSocket.bind(new InetSocketAddress(broadcastPort));
-        
+        advertiseSocket.bind(new InetSocketAddress(broadcastPort));        
         this.broadcastPort = broadcastPort;
-        //this.serviceAddr = InetAddress.getLocalHost();
         this.servicePort = servicePort;
         
         Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
@@ -40,27 +31,60 @@ public class PeerAdvertiseThread extends Thread
         	System.out.println("DisplayName: " + i.getDisplayName());
         	System.out.println("Virtual: " + i.isVirtual());
         	System.out.println("Loopback: " + i.isLoopback());
-        	
-        	Enumeration<InetAddress> addresses = i.getInetAddresses();
-        	System.out.println("Addresses:");
-            for (InetAddress a : Collections.list(addresses))
-            {
-            	System.out.println("  " + a.getHostAddress());
-            }*/
+        	System.out.println("Up: " + i.isUp());*/
             
-            if(!i.isLoopback() && !i.isVirtual())
+            if(!i.isLoopback() && !i.isVirtual() && i.isUp())
             {
+            	Enumeration<InetAddress> addresses = i.getInetAddresses();
+            	//System.out.println("Addresses:");
+                for (InetAddress a : Collections.list(addresses))
+                {
+                	if (a instanceof Inet4Address){                		
+                		//System.out.println(a.getHostAddress());
+                	}
+                }
+                
             	List<InterfaceAddress> iAddresses = i.getInterfaceAddresses();
-            	//System.out.println("Broadcast Addresses:");
             	for (InterfaceAddress ia : iAddresses)
             	{
-            		if (ia.getBroadcast() != null){
+            		/*if (ia.getBroadcast() != null){
             			broadcastAddresses.add(ia.getBroadcast());
-            			//System.out.println("  " + ia.getBroadcast().getHostAddress());
-            		}
+            			System.out.println("Broadcast Address: " + ia.getBroadcast().getHostAddress());
+            		}*/
+
+            		InetAddress host = ia.getAddress();
+            		if (host instanceof Inet6Address)
+            			continue;
+            		int prefixLength = ia.getNetworkPrefixLength();
+            		InetAddress broadcast = getBroadcast(host, prefixLength);
+            		broadcastAddresses.add(broadcast);
+            		//System.out.println("Host Address: " + ia.getAddress().getHostAddress());
+            		//System.out.println("Network Prefix Length: " + ia.getNetworkPrefixLength());
+            		//System.out.println("Broadcast Address calculated: " + broadcast.getHostAddress());
             	}
             }
         }        
+    }
+    
+    private InetAddress getBroadcast(InetAddress host, int prefixLength)
+    {
+    	if (host instanceof Inet6Address)
+    		return null;
+    	
+    	int shft = 0xffffffff>>>(prefixLength);
+    	byte[] address = host.getAddress();
+    	
+    	address[0] = (byte) (((byte) ((shft&0xff000000)>>24)) | address[0]);
+    	address[1] = (byte) (((byte) ((shft&0x00ff0000)>>16)) | address[1]);
+    	address[2] = (byte) (((byte) ((shft&0x0000ff00)>>8)) | address[2]);
+    	address[3] = (byte) (((byte) (shft&0x000000ff)) | address[3]);
+    	
+    	try {
+			return InetAddress.getByAddress(address);
+		} catch (UnknownHostException e) {
+			return null;
+		}
+    	
     }
 
     public void run()

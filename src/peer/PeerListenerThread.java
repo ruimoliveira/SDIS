@@ -11,16 +11,9 @@ public class PeerListenerThread extends Thread
     public PeerListenerThread(String name, int listeningPort) throws IOException
     {
         super(name);
-        
-        // create an unbound socket
         advertiseSocket = new DatagramSocket(null);
-
-        // make it possible to bind several sockets to the same port
         advertiseSocket.setReuseAddress(true);
-
-        // might not be necessary, but for clarity
         advertiseSocket.setBroadcast(true);
-
         advertiseSocket.bind(new InetSocketAddress(listeningPort));        
     }
 
@@ -34,6 +27,7 @@ public class PeerListenerThread extends Thread
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 advertiseSocket.receive(packet);
                 String request = new String(buf);
+                //System.out.println("broadcast received: " + request);
                 
                 Thread t = new Thread()
                 {
@@ -75,6 +69,7 @@ public class PeerListenerThread extends Thread
 		}
 		else{
 			peersInRange.put(id, new PeerInRange(id, ip, port));
+			System.out.println("new peer in range: " + id);
 		}
 	}
 }

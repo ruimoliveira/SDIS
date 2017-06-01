@@ -18,19 +18,19 @@ public class Peer
 	private static String id = null;
 	private static ConcurrentHashMap<String, PeerInRange> peersInRange = new ConcurrentHashMap<String, PeerInRange>();
 	static ConcurrentHashMap<String, Long> messagesReceived = new ConcurrentHashMap<String, Long>();
-	static ConcurrentHashMap<String, Integer> storedMSGSreceived = new ConcurrentHashMap<String, Integer>();
+	static ConcurrentHashMap<String, Integer> storedReceived = new ConcurrentHashMap<String, Integer>();
 			
 	public static void main(String[] args) throws IOException
 	{
 		id = IdGenerator.nextId();
 		int httpServerPort = Integer.parseInt(args[0]);
 		
-		//Initiate http server
+		/*Initiate http server*/
 		try {
 			HttpServer server = HttpServer.create(new InetSocketAddress(httpServerPort), 0);
 			server.createContext("/file", new FileHandler());
-			//server.createContext("/files", new FilesHandler());
-			server.createContext("/fileStored", new StoredHandler());
+			server.createContext("/files", new FilesHandler());
+			server.createContext("/stored", new StoredHandler());
 			server.createContext("/client", new ClientHandler());
 			server.setExecutor(new ThreadPoolExecutor(4, 8, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(100)));
 			server.start();
@@ -40,17 +40,20 @@ public class Peer
 			e.printStackTrace();
 		}
 		
-		//Initiate server port advertise thread
+		/*Initiate server port advertise thread*/
         Thread advertiseThread = new PeerAdvertiseThread("advertiser", 7000, httpServerPort);
         advertiseThread.start();
         
-        //Initiate peers in range listener thread
+        /*Initiate peers in range listener thread*/
         Thread listenerThread = new PeerListenerThread("listener", 7000);
         listenerThread.start();
         
-        //Initiate messages cleaner thread
+        /*Initiate messages cleaner thread*/
     	Timer timer = new Timer();
     	timer.schedule(new MessagesCleanerTask(300000), 0, 30000);
+    	
+    	//Timer testTimer = new Timer();
+    	//testTimer.schedule(new Tests.TestTask(), 0, 5000);
     }
 	
 	protected static String getId(){
@@ -72,6 +75,20 @@ public class Peer
 		messagesReceived.put(msgId, System.currentTimeMillis());
 	}
 	
+	protected static void addStoredReceived(String msgId)
+	{
+		if (storedReceived.containsKey(msgId))
+			storedReceived.put(msgId, storedReceived.get(msgId));
+		else storedReceived.put(msgId, 1);
+	}
+
+	public static int getStoredCounter(String msgId)
+	{
+		if (storedReceived.containsKey(msgId))
+			return storedReceived.get(msgId);
+		return 0;
+	}
+	
     static class MessagesCleanerTask extends TimerTask
     {
     	long milisecs;
@@ -82,40 +99,16 @@ public class Peer
     	
         public void run()
         {        	
-        	String aux = null;
-        	boolean deleted = false; 
     		for(Entry<String, Long> entry : messagesReceived.entrySet())
     		{
     			if (entry.getValue() + milisecs < System.currentTimeMillis())
     			{
-    				aux = entry.getKey();
-    				messagesReceived.remove(entry.getKey());
-    				deleted = true;
+    				String key = entry.getKey();
+    				messagesReceived.remove(key);
+    				if (storedReceived.containsKey(key))
+    					messagesReceived.remove(key);
     			}
     		}
-    		
-    		if (deleted)
-	    		for(Entry<String, Integer> entry2 : storedMSGSreceived.entrySet())
-	    		{
-	    			if (entry2.getKey().compareTo(aux) == 0)
-	    				storedMSGSreceived.remove(entry2.getKey());
-	    		}
         }
     }
-	
-	protected static void addStoredMessageReceived(String msgId)
-	{
-		storedMSGSreceived.put(msgId, 0);
-	}
-
-	public static int getSavedMessagesCounter(String messageID)
-	{
-		for(Entry<String, Integer> entry : storedMSGSreceived.entrySet())
-		{
-			if (entry.getKey().compareTo(messageID) == 0)
-				return entry.getValue();
-		}
-		
-		return -1;
-	}
 }
